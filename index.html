@@ -1,0 +1,2484 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Space Shooters</title>
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:#070a12; overflow:hidden; font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    canvas { display:block; width:100vw; height:100vh; touch-action:none; }
+  body { touch-action:none; overscroll-behavior:none; }
+
+    .hud {
+      position:fixed; left:12px; top:12px; color:#d7e2f0; font-size:14px; user-select:none;
+      text-shadow: 0 2px 10px rgba(0,0,0,.65);
+      pointer-events:none;
+    }
+    .bars { margin-top:8px; width:290px; }
+    .bar { height:10px; background:rgba(255,255,255,.10); border-radius:999px; overflow:hidden; margin:6px 0; }
+    .fill { height:100%; width:50%; }
+    .hp { background:linear-gradient(90deg,#ff4d5a,#ff9b64); }
+    .xp { background:linear-gradient(90deg,#6ae4ff,#7c7bff); }
+    .chipRow { margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; opacity:.92; }
+    .chip {
+      font-size:12px; padding:3px 8px; border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+    }
+
+    .toast {
+      position:fixed; right:12px; top:12px; color:#d7e2f0; font-size:12px; opacity:.0;
+      text-shadow: 0 2px 10px rgba(0,0,0,.65);
+      max-width: 40ch;
+      transition:opacity .12s ease;
+      pointer-events:none;
+    }
+
+    .overlay {
+      position:fixed; inset:0; display:none; align-items:center; justify-content:center;
+      background:rgba(0,0,0,.62);
+    }
+    .panel {
+      width:min(980px, 94vw);
+      background:rgba(10,14,24,.92);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:18px;
+      padding:18px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.60);
+      color:#e7f0ff;
+      backdrop-filter: blur(8px);
+    }
+    .panel h1 { margin:0 0 8px 0; font-size:26px; letter-spacing:.2px; }
+    .panel h2 { margin:0 0 10px 0; font-size:18px; opacity:.95; }
+    .sub { opacity:.8; font-size:13px; line-height:1.35; }
+    .row { display:flex; gap:14px; align-items:stretch; flex-wrap:wrap; }
+    .col { flex:1 1 320px; }
+
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      padding:10px 12px; border-radius:12px; cursor:pointer; user-select:none;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.08);
+      color:#e7f0ff;
+      transition:transform .08s ease, background .08s ease, border-color .08s ease;
+      font-weight:650;
+    }
+    .btn:hover { transform: translateY(-1px); background:rgba(255,255,255,.10); border-color:rgba(255,255,255,.24); }
+    .btn:active { transform: translateY(0px); }
+    .btn.primary { background:rgba(106,228,255,.16); border-color:rgba(106,228,255,.30); }
+    .btn.danger { background:rgba(255,77,90,.14); border-color:rgba(255,77,90,.28); }
+
+    .cards { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:12px; margin-top:12px; }
+    @media (max-width: 760px){ .cards{ grid-template-columns:1fr; } }
+    .card {
+      border-radius:14px; padding:12px; cursor:pointer;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      transition:transform .08s ease, background .08s ease, border-color .08s ease;
+      min-height:98px;
+    }
+    .card:hover { transform: translateY(-2px); background:rgba(255,255,255,.09); border-color:rgba(255,255,255,.22); }
+    .card .t { font-weight:800; margin-bottom:6px; display:flex; justify-content:space-between; gap:10px; }
+    .card .d { opacity:.92; font-size:13px; line-height:1.25; }
+    .rar { font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.06); white-space:nowrap; }
+    .hint { margin-top:12px; opacity:.8; font-size:12px; }
+    .kbd { display:inline-block; padding:2px 6px; border:1px solid rgba(255,255,255,.18); border-radius:7px; background:rgba(255,255,255,.08); }
+
+    .shopList { margin-top:10px; display:flex; flex-direction:column; gap:10px; }
+    .shopItem {
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      border-radius:14px;
+      padding:12px;
+      display:flex;
+      justify-content:space-between;
+      gap:14px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .shopItem .metaTitle { font-weight:800; }
+    .shopItem .metaDesc { opacity:.85; font-size:13px; margin-top:4px; line-height:1.25; }
+    .shopItem .metaLv { opacity:.8; font-size:12px; margin-top:6px; }
+    .right { display:flex; gap:10px; align-items:center; }
+    .cost { font-size:12px; opacity:.85; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14); background:rgba(0,0,0,.15); }
+    .divider { height:1px; background:rgba(255,255,255,.10); margin:12px 0; }
+
+    .small { font-size:12px; opacity:.78; line-height:1.35; }
+  
+    /* Meta Upgrades scroll */
+    #metaOverlay .panel { max-height: 86vh; overflow: hidden; }
+    #shopList { max-height: 58vh; overflow: auto; padding-right: 6px; }
+    #shopList::-webkit-scrollbar { width: 10px; }
+    #shopList::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 999px; }
+    #shopList::-webkit-scrollbar-track { background: rgba(0,0,0,.18); border-radius: 999px; }
+
+  </style>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Space Shooters">
+
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud" id="hud">
+  <div style="display:flex;align-items:baseline;gap:10px;">
+    <div style="font-weight:800;">Space Shooters</div>
+    <div style="opacity:.7;font-size:12px" id="runTag"></div>
+  </div>
+  <div id="stats"></div>
+  <div class="bars">
+    <div class="bar"><div class="fill hp" id="hpFill"></div></div>
+    <div class="bar"><div class="fill xp" id="xpFill"></div></div>
+  </div>
+  <div style="opacity:.82;font-size:12px;margin-top:2px" id="levelInfo"></div>
+  <div class="chipRow" id="chips"></div>
+  <div style="opacity:.7;font-size:12px;margin-top:8px">Move: WASD / Arrows • Pause: <span class="kbd">P</span> • Upgrade: 1/2/3 or click</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MENU -->
+<div class="overlay" id="menuOverlay" style="display:flex;">
+  <div class="panel">
+    <h1>🚀 Space Shooters</h1>
+    <div class="sub">A Survivor.io + Vampire Survivors mashup with an <b>Astro‑party</b> vibe: neon space, Space‑Invaders enemies, and asteroid hazards.</div>
+    <div class="divider"></div>
+    <div class="row">
+      <div class="col">
+        <h2>Start</h2>
+        <div class="sub">Your meta upgrades apply automatically at the start of a run.</div>
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+          <div class="btn primary" id="playBtn">Play Run</div>
+          <div class="btn" id="metaBtn">Meta Upgrades</div>
+          <div class="btn danger" id="wipeBtn">Reset Save</div>
+        </div>
+        <div style="margin-top:12px" class="small">
+          <b>Asteroids:</b> stationary hazards. Touching one deals <b>10% of your max HP</b> (with a short cooldown).<br/>
+          <b>Goal:</b> survive, level up, and earn <b>Stardust</b> to buy meta upgrades.
+        </div>
+      </div>
+      <div class="col">
+        <h2>Profile</h2>
+        <div class="sub"><b>Stardust:</b> <span id="currencyLabel">0</span> ✦</div>
+        <div class="divider"></div>
+        <div class="sub"><b>Tips:</b></div>
+        <div class="small">
+          • Move in smooth circles (kiting) to group invaders.<br/>
+          • Rare+ upgrades are strong — boost <b>Luck</b> in meta shop to see them more often.<br/>
+          • If you pick a new weapon, prioritize its cooldown + damage upgrades.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- META SHOP -->
+<div class="overlay" id="metaOverlay">
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;">
+      <h1>🛠️ Meta Upgrades</h1>
+      <div class="sub">Stardust: <b><span id="currencyLabel2">0</span> ✦</b></div>
+    </div>
+    <div class="sub">These upgrades persist between runs (saved to your Chromebook via local storage).</div>
+    <div class="shopList" id="shopList"></div>
+    <div class="divider"></div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <div class="btn" id="backToMenuBtn">Back</div>
+    </div>
+    <div class="small" style="margin-top:10px">
+      Save is stored locally in your browser. If you clear browser data, your Stardust/meta levels reset.
+    </div>
+  </div>
+</div>
+
+<!-- LEVEL UP -->
+<div class="overlay" id="levelUpOverlay">
+  <div class="panel">
+    <h1>Level Up!</h1>
+    <h2>Choose an upgrade</h2>
+    <div class="cards" id="cards"></div>
+    <div class="hint">Press <span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span></div>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div class="overlay" id="gameOverOverlay">
+  <div class="panel">
+    <h1>Game Over</h1>
+    <div id="gameOverText" class="sub" style="margin-top:8px"></div>
+    <div class="divider"></div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <div class="btn primary" id="restartBtn">Play Again</div>
+      <div class="btn" id="toMenuBtn">Main Menu</div>
+      <div class="btn" id="toMetaBtn">Meta Upgrades</div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+  // PWA: register service worker (offline support)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    });
+  }
+(() => {
+  // ---------- helpers ----------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  const lerpAngle = (a,b,t)=>{
+    const TAU = Math.PI*2;
+    let d = (b - a) % TAU;
+    if (d > Math.PI) d -= TAU;
+    if (d < -Math.PI) d += TAU;
+    return a + d * t;
+  };
+  const rand = (a=0, b=1) => a + Math.random() * (b - a);
+  const irand = (a, b) => Math.floor(rand(a, b+1));
+  const dist2 = (ax, ay, bx, by) => { const dx=ax-bx, dy=ay-by; return dx*dx+dy*dy; };
+  const hypot = (x,y)=>Math.hypot(x,y)||1;
+
+
+  // ---------- audio (procedural, no external files) ----------
+  let audioCtx = null;
+  let master = null, musicBus = null, sfxBus = null;
+  let musicTimer = null;
+  let musicMode = "menu";
+  let desiredMusic = "menu";
+  let muted = false;
+  let audioReady = false;
+  let dieSfxCd = 0;
+
+  function ensureAudio() {
+    if (audioReady) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+
+    master = audioCtx.createGain();
+    master.gain.value = 0.55;
+
+    musicBus = audioCtx.createGain();
+    musicBus.gain.value = 0.22;
+
+    sfxBus = audioCtx.createGain();
+    sfxBus.gain.value = 0.80;
+
+    musicBus.connect(master);
+    sfxBus.connect(master);
+    master.connect(audioCtx.destination);
+
+    audioReady = true;
+  }
+
+  function userGestureAudio() {
+    ensureAudio();
+    if (!audioReady) return;
+    // required by most browsers: resume only after a user gesture
+    audioCtx.resume();
+    updateMusic();
+  }
+
+  function setMuted(m) {
+    muted = !!m;
+    if (audioReady) master.gain.value = muted ? 0 : 0.55;
+    toast(muted ? "\ud83d\udd07 Muted (M)" : "\ud83d\udd0a Sound On");
+    updateMusic();
+  }
+
+  function stopMusic() {
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  }
+
+  function tone(freq, dur, type="square", vol=0.18, bus=null, slideTo=null) {
+    if (!audioReady || muted) return;
+    bus = bus || sfxBus;
+    const t0 = audioCtx.currentTime;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(Math.max(30, freq), t0);
+    if (slideTo && slideTo > 0) {
+      o.frequency.exponentialRampToValueAtTime(Math.max(30, slideTo), t0 + Math.max(0.02, dur));
+    }
+
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + Math.max(0.02, dur));
+
+    o.connect(g);
+    g.connect(bus);
+
+    o.start(t0);
+    o.stop(t0 + dur + 0.03);
+  }
+
+  function noise(dur, vol=0.22, hp=180, lp=9000, bus=null) {
+    if (!audioReady || muted) return;
+    bus = bus || sfxBus;
+    const t0 = audioCtx.currentTime;
+
+    const len = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+    const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i=0;i<len;i++) data[i] = (Math.random()*2 - 1);
+
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+
+    const hpf = audioCtx.createBiquadFilter();
+    hpf.type = "highpass";
+    hpf.frequency.value = hp;
+
+    const lpf = audioCtx.createBiquadFilter();
+    lpf.type = "lowpass";
+    lpf.frequency.value = lp;
+
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, vol), t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + Math.max(0.02, dur));
+
+    src.connect(hpf);
+    hpf.connect(lpf);
+    lpf.connect(g);
+    g.connect(bus);
+
+    src.start(t0);
+    src.stop(t0 + dur + 0.02);
+  }
+
+  function startMusic(mode) {
+    if (!audioReady || muted) return;
+    stopMusic();
+    musicMode = mode;
+    let step = 0;
+
+    // simple chiptune-ish patterns
+    const bpm = (mode === "menu") ? 94 : 128;
+    const interval = (60000 / bpm) / 2; // eighth notes
+    const base = (mode === "menu") ? 196 : 220;
+    const minor = [0, 3, 5, 7, 10, 12];
+    const menuSeq = [0, 2, 3, 4, 3, 2, 1, 2];
+    const gameSeq = [0, 2, 4, 2, 5, 4, 2, 1];
+
+    musicTimer = setInterval(() => {
+      if (!audioReady || muted) return;
+      const seq = (mode === "menu") ? menuSeq : gameSeq;
+      const deg = seq[step % seq.length] % minor.length;
+      const semis = minor[deg];
+      const f = base * Math.pow(2, semis/12);
+
+      // lead
+      tone(f, 0.11, (mode === "menu") ? "triangle" : "square", 0.10, musicBus);
+
+      // bass pulse
+      if (step % 2 === 0) tone(base/2, 0.08, "sine", 0.08, musicBus);
+
+      // tiny accent
+      if (mode === "game" && step % 4 === 3) tone(base*2, 0.05, "square", 0.05, musicBus);
+
+      step++;
+    }, interval);
+  }
+
+  function updateMusic() {
+    desiredMusic = (state === "PLAY" || state === "PAUSE" || state === "LEVELUP") ? "game" : "menu";
+    if (!audioReady || muted) return;
+    if (!musicTimer || musicMode !== desiredMusic) startMusic(desiredMusic);
+  }
+
+  // --- SFX ---
+  function sfxShoot() {
+    if (!audioReady || muted) return;
+    tone(720, 0.06, "square", 0.12, sfxBus, 420);
+  }
+  function sfxEnemyDie(isBoss=false) {
+    if (!audioReady || muted) return;
+    if (!isBoss) {
+      if (dieSfxCd > 0) return;
+      dieSfxCd = 0.03;
+    }
+    noise(isBoss ? 0.22 : 0.11, isBoss ? 0.30 : 0.18, 240, 7800, sfxBus);
+    tone(isBoss ? 140 : 220, isBoss ? 0.22 : 0.10, "sawtooth", isBoss ? 0.20 : 0.12, sfxBus, isBoss ? 55 : 120);
+  }
+  function sfxAsteroidHit() {
+    if (!audioReady || muted) return;
+    noise(0.10, 0.14, 60, 2500, sfxBus);
+    tone(92, 0.12, "triangle", 0.16, sfxBus, 70);
+  }
+  function sfxPlayerDie() {
+    if (!audioReady || muted) return;
+    noise(0.45, 0.28, 80, 4200, sfxBus);
+    tone(180, 0.45, "sawtooth", 0.22, sfxBus, 45);
+  }
+
+  // ---------- canvas ----------
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  function resize() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
+    canvas.style.width = innerWidth + "px";
+    canvas.style.height = innerHeight + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener('resize', resize);
+  resize();
+  ctx.imageSmoothingEnabled = false;
+
+  canvas.addEventListener('pointerdown', userGestureAudio);
+
+  // ---------- UI elements ----------
+  const hud = document.getElementById('hud');
+  const runTag = document.getElementById('runTag');
+  const statsEl = document.getElementById('stats');
+  const levelInfo = document.getElementById('levelInfo');
+  const chipsEl = document.getElementById('chips');
+  const hpFill = document.getElementById('hpFill');
+  const xpFill = document.getElementById('xpFill');
+  const toastEl = document.getElementById('toast');
+
+  const menuOverlay = document.getElementById('menuOverlay');
+  const metaOverlay = document.getElementById('metaOverlay');
+  const levelUpOverlay = document.getElementById('levelUpOverlay');
+  const gameOverOverlay = document.getElementById('gameOverOverlay');
+
+  const playBtn = document.getElementById('playBtn');
+  const metaBtn = document.getElementById('metaBtn');
+  const wipeBtn = document.getElementById('wipeBtn');
+  const backToMenuBtn = document.getElementById('backToMenuBtn');
+
+  const currencyLabel = document.getElementById('currencyLabel');
+  const currencyLabel2 = document.getElementById('currencyLabel2');
+
+  // Throttled HUD updates (reduces layout/DOM churn)
+  let uiTimer = 0;
+  let lastHudHTML = "";
+  let lastLevelHTML = "";
+  let lastChipsHTML = "";
+  let lastHpPct = -1;
+  let lastXpPct = -1;
+  let lastDust = -1;
+
+  function updateHUD(dt) {
+    uiTimer += dt;
+    if (uiTimer < 0.10) return; // 10 Hz
+    uiTimer = 0;
+
+    // currency (menu/meta)
+    if (save && save.stardust !== lastDust) {
+      lastDust = save.stardust;
+      currencyLabel.textContent = String(save.stardust);
+      currencyLabel2.textContent = String(save.stardust);
+    }
+
+    if (!(state==="PLAY" || state==="PAUSE" || state==="LEVELUP")) return;
+
+    runTag.textContent = state==="PAUSE" ? "PAUSED" : "";
+
+    const hudHTML = `Time: <b>${formatTime(t)}</b> • Level: <b>${player.level}</b> • Kills: <b>${kills}</b> • Enemies: <b>${enemies.length}</b>`;
+    if (hudHTML !== lastHudHTML) { lastHudHTML = hudHTML; statsEl.innerHTML = hudHTML; }
+
+    const hpPct = Math.round(clamp(player.hp / player.maxHp, 0, 1) * 1000) / 10;
+    if (hpPct !== lastHpPct) { lastHpPct = hpPct; hpFill.style.width = `${hpPct}%`; }
+
+    const xpPct = Math.round(clamp(player.xp / player.xpToNext, 0, 1) * 1000) / 10;
+    if (xpPct !== lastXpPct) { lastXpPct = xpPct; xpFill.style.width = `${xpPct}%`; }
+
+    const levelHTML = `Level <b>${player.level}</b> • XP <b>${Math.floor(player.xp)}</b> / ${player.xpToNext}`;
+    if (levelHTML !== lastLevelHTML) { lastLevelHTML = levelHTML; levelInfo.innerHTML = levelHTML; }
+
+    const chips = [];
+    chips.push(`Armor ${build.armor||0}`);
+    chips.push(`Luck ${player.luck}`);
+    if (build.slowField.unlocked) chips.push(`SlowField ${build.slowField.radius}px`);
+    if (build.laser.unlocked) chips.push(`Laser`);
+    if (build.drone.unlocked) chips.push(`Drones ${build.drone.count}`);
+    if (build.missile.unlocked) chips.push(`Missiles`);
+    if (player.shield.unlocked) chips.push(`Shield ${player.shield.charges}/${player.shield.maxCharges}`);
+    if (player.pickupBoostTimer > 0) chips.push(`MegaMagnet ${player.pickupBoostTimer.toFixed(1)}s`);
+
+    const chipsHTML = chips.map(c => `<span class="chip">${c}</span>`).join("");
+    if (chipsHTML !== lastChipsHTML) { lastChipsHTML = chipsHTML; chipsEl.innerHTML = chipsHTML; }
+  }
+
+  const shopList = document.getElementById('shopList');
+
+  const cardsEl = document.getElementById('cards');
+
+  const gameOverText = document.getElementById('gameOverText');
+  const restartBtn = document.getElementById('restartBtn');
+  const toMenuBtn = document.getElementById('toMenuBtn');
+  const toMetaBtn = document.getElementById('toMetaBtn');
+
+  // ---------- input ----------
+  const keys = new Set();
+  // Touch joystick (mobile)
+  let touchStick = { active:false, id:null, sx:0, sy:0, x:0, y:0, mx:0, my:0, mag:0 };
+  const isTouchLike = () => ('ontouchstart' in window) || (navigator.maxTouchPoints||0) > 0;
+  addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(k)) e.preventDefault();
+    keys.add(k);
+
+    // unlock audio on any key press
+    if (!audioReady) userGestureAudio();
+    if (k === 'm') setMuted(!muted);
+
+    if (state === "LEVELUP") {
+      if (e.key === "1") pickUpgrade(0);
+      if (e.key === "2") pickUpgrade(1);
+      if (e.key === "3") pickUpgrade(2);
+    }
+    if (state === "PLAY" && k === "p") togglePause();
+    if (state === "PAUSE" && k === "p") togglePause();
+    if (state === "GAMEOVER" && (k === "r" || e.key === "Enter")) startRun();
+  });
+  addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+
+  // ---------- save / meta ----------
+  const SAVE_KEY = "space_survivors_save_v1";
+  const defaultSave = () => ({
+    stardust: 0,
+    meta: {
+      hp: 0,
+      dmg: 0,
+      spd: 0,
+      pickup: 0,
+      armor: 0,
+      regen: 0,
+      luck: 0,
+      startDrone: 0,
+      startShield: 0,
+      startLevel: 0
+    },
+    best: { time: 0, level: 1, kills: 0 }
+  });
+
+  let save = loadSave();
+
+  function loadSave() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return defaultSave();
+      const obj = JSON.parse(raw);
+      // basic migration / merge
+      const base = defaultSave();
+      base.stardust = Number(obj.stardust || 0);
+      base.meta = Object.assign(base.meta, obj.meta || {});
+      base.best = Object.assign(base.best, obj.best || {});
+      return base;
+    } catch {
+      return defaultSave();
+    }
+  }
+
+  function writeSave() {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    currencyLabel.textContent = String(save.stardust);
+    currencyLabel2.textContent = String(save.stardust);
+  }
+
+  function resetSave() {
+    save = defaultSave();
+    writeSave();
+    toast("Save reset.");
+    renderShop();
+  }
+
+  // meta definitions
+  const META = [
+    { id:"hp", name:"Hull Plating", max: 20, base: 25, scale: 1.18,
+      desc: (lv)=>`+${lv*15} Max HP (start run with more health).` },
+    { id:"dmg", name:"Weapon Calibration", max: 20, base: 30, scale: 1.20,
+      desc: (lv)=>`+${(lv*6)}% base damage to all weapons.` },
+    { id:"spd", name:"Thruster Tune", max: 15, base: 24, scale: 1.17,
+      desc: (lv)=>`+${(lv*4)}% move speed.` },
+    { id:"pickup", name:"Magnet Array", max: 15, base: 22, scale: 1.17,
+      desc: (lv)=>`+${(lv*10)} pickup radius.` },
+    { id:"armor", name:"Impact Dampeners", max: 10, base: 28, scale: 1.22,
+      desc: (lv)=>`Armor +${lv} (reduces contact damage).` },
+    { id:"regen", name:"Nanite Repair", max: 12, base: 26, scale: 1.19,
+      desc: (lv)=>`+${(lv*0.6).toFixed(1)}/sec regen.` },
+    { id:"luck", name:"Signal Luck", max: 12, base: 40, scale: 1.25,
+      desc: (lv)=>`Higher chance to see Rare+ upgrades (Luck +${lv}).` },
+    { id:"startDrone", name:"Starter Drone", max: 1, base: 90, scale: 1.0,
+      desc: (lv)=> lv>0 ? `Start with 1 Gun Drone unlocked.` : `Start runs with a Gun Drone.` },
+    { id:"startShield", name:"Starter Shield", max: 1, base: 110, scale: 1.0,
+      desc: (lv)=> lv>0 ? `Start with Shield Module unlocked.` : `Start runs with a Shield Module.` },
+    { id:"startLevel", name:"Academy Training", max: 3, base: 75, scale: 1.28,
+      desc: (lv)=>`Start at level ${1+lv} (instant early upgrades).` },
+  ];
+
+  function metaCost(id, nextLevel) {
+    const m = META.find(x=>x.id===id);
+    const base = m.base;
+    const c = Math.round(base * Math.pow(m.scale, nextLevel));
+    return Math.max(1, c);
+  }
+
+  function buyMeta(id) {
+    const m = META.find(x=>x.id===id);
+    const lv = save.meta[id] || 0;
+    if (lv >= m.max) return toast("Maxed out.");
+    const cost = metaCost(id, lv+1);
+    if (save.stardust < cost) return toast("Not enough Stardust.");
+    save.stardust -= cost;
+    save.meta[id] = lv + 1;
+    writeSave();
+    renderShop();
+    toast(`Purchased: ${m.name}`);
+  }
+
+  function renderShop() {
+    shopList.innerHTML = "";
+    for (const m of META) {
+      const lv = save.meta[m.id] || 0;
+      const cost = lv >= m.max ? null : metaCost(m.id, lv+1);
+      const el = document.createElement("div");
+      el.className = "shopItem";
+      el.innerHTML = `
+        <div style="min-width:260px;max-width:640px;">
+          <div class="metaTitle">${m.name}</div>
+          <div class="metaDesc">${m.desc(lv)}</div>
+          <div class="metaLv">Level: <b>${lv}</b> / ${m.max}</div>
+        </div>
+        <div class="right">
+          ${cost===null ? `<div class="cost">MAX</div>` : `<div class="cost">${cost} ✦</div>`}
+          <div class="btn ${cost===null?'':'primary'}" style="${cost===null?'opacity:.55;pointer-events:none;':''}" data-buy="${m.id}">
+            ${cost===null ? "Maxed" : "Buy"}
+          </div>
+        </div>
+      `;
+      shopList.appendChild(el);
+    }
+    shopList.querySelectorAll("[data-buy]").forEach(btn=>{
+      btn.addEventListener("click", ()=>buyMeta(btn.getAttribute("data-buy")));
+    });
+  }
+
+  // ---------- rarity ----------
+  const RARITIES = ["Common","Uncommon","Rare","Epic","Legendary","Mythic","Ethereal"]; // in order as requested
+  const RARITY_COLORS = {
+    Common:    "rgba(220,230,255,.18)",
+    Uncommon:  "rgba(120,255,170,.18)",
+    Rare:      "rgba(90,180,255,.18)",
+    Epic:      "rgba(190,110,255,.18)",
+    Legendary: "rgba(255,190,90,.18)",
+    Mythic:    "rgba(255,90,130,.18)",
+    Ethereal:  "rgba(255,255,255,.20)",
+  };
+
+  function rollRarity(luck=0) {
+    // luck pushes probability slightly upward toward higher rarities
+    // baseline weights sum ~100
+    const base = [
+      {r:"Common", w:55},
+      {r:"Uncommon", w:25},
+      {r:"Rare", w:12},
+      {r:"Epic", w:5},
+      {r:"Legendary", w:2},
+      {r:"Mythic", w:0.8},
+      {r:"Ethereal", w:0.2},
+    ];
+    // shift some weight from low -> high as luck increases
+    const L = clamp(luck, 0, 12);
+    const shift = L * 0.65; // total shift points
+    base[0].w = Math.max(40, base[0].w - shift*1.2);
+    base[1].w = Math.max(18, base[1].w - shift*0.6);
+    base[2].w = base[2].w + shift*0.6;
+    base[3].w = base[3].w + shift*0.32;
+    base[4].w = base[4].w + shift*0.18;
+    base[5].w = base[5].w + shift*0.07;
+    base[6].w = base[6].w + shift*0.03;
+
+    let total = 0;
+    for (const b of base) total += b.w;
+    let roll = Math.random() * total;
+    for (const b of base) {
+      roll -= b.w;
+      if (roll <= 0) return b.r;
+    }
+    return "Common";
+  }
+
+  // ---------- game state ----------
+  let state = "MENU"; // MENU | META | PLAY | PAUSE | LEVELUP | GAMEOVER
+  let t = 0;
+  let kills = 0;
+  let stardustEarned = 0;
+  let elitesKilled = 0;
+  let nextEliteLevel = 6;
+  let nextBossLevel = 10;
+  let boss = null;
+  let arena = { active:false, x:0, y:0, r:0, wall:12 };
+
+  // ---------- player + build ----------
+  const basePlayer = () => ({
+    x: 0, y: 0, r: 12,
+    vx: 0, vy: 0,
+    angle: -Math.PI/2,
+    spd: 220,
+    hp: 100, maxHp: 100,
+    regen: 0,
+    level: 1,
+    xp: 0,
+    xpToNext: 26,
+    pickup: 84,
+    pickupBoostTimer: 0,
+    nukeFlash: 0,
+    invuln: 0,
+    luck: 0,
+    shield: { unlocked:false, charges:0, maxCharges:0, recharge:0, cd:0 },
+    asteroidCd: 0,
+  });
+
+  const baseBuild = () => ({
+    // base weapon: Ion Bolts
+    bolt: { lvl: 1, dmg: 12, rate: 0.55, speed: 540, shots: 1, spread: 0.18, pierce: 0, crit: 0.05, critMult: 1.6, chain: 0 },
+    // orbiting: Plasma Orbs
+    orbs: { unlocked:false, lvl:0, count:0, radius: 46, dmg: 9, spin: 2.8, tick: 0.20 },
+    // AOE pulse: EMP
+    emp: { unlocked:false, lvl:0, dmg: 24, baseRate: 5.6, radius: 98 },
+    // Gun drones
+    drone: { unlocked:false, lvl:0, count:0, dmg: 8, rate: 0.85, speed: 520 },
+    // Homing missiles
+    missile: { unlocked:false, lvl:0, dmg: 40, rate: 3.4, speed: 390, radius: 70 },
+    // Laser beam
+    laser: { unlocked:false, lvl:0, dmg: 55, rate: 4.8, width: 10, pierce: 2 },
+    // economy / misc
+    xpGain: 1.0,
+    dustGain: 1.0,
+    slowField: { unlocked:false, lvl:0, radius: 120, slow: 0.18 },
+  });
+
+  let player = basePlayer();
+  let build = baseBuild();
+
+  // entities
+  let enemies = [];
+  let bullets = [];
+  let enemyShots = [];
+  let orbsXP = [];
+  let pops = [];
+  let drops = [];
+  let asteroids = [];
+  let stars = [];
+
+  const PERF = { maxOrbs: 520, maxPops: 180, maxBullets: 260, maxEnemyShots: 260, maxDrops: 12 };
+
+  // timers
+  let boltTimer = 0;
+  let empTimer = 0;
+  let spawnTimer = 0;
+  let droneTimer = 0;
+  let missileTimer = 0;
+  let laserTimer = 0;
+
+  // ---------- sprites (Space Invaders-ish) ----------
+  // 11x8 pixel patterns; 1=filled
+  const SPRITES = {
+    // Custom "invader-inspired" sprites (not the originals)
+    // 13x9 patterns for more variety
+    grunt: [
+      "0000110001100",
+      "0001111111110",
+      "0011011111011",
+      "0111111111111",
+      "1110111111101",
+      "1111111111111",
+      "1011100001110",
+      "0011000000110",
+      "0110001100011",
+    ],
+    runner: [
+      "0000011111000",
+      "0001111111110",
+      "0011111111111",
+      "0110111011101",
+      "1111111111111",
+      "0011111111110",
+      "0110001100011",
+      "1100011000110",
+      "0001100001100",
+    ],
+    tank: [
+      "0011111111110",
+      "0111111111111",
+      "1111011111011",
+      "1111111111111",
+      "1111111111111",
+      "1011111111110",
+      "0011100001110",
+      "0110000000011",
+      "1100110001101",
+    ],
+    elite: [
+      "0001111111100",
+      "0111111111110",
+      "1110111111101",
+      "1111111111111",
+      "0111111111110",
+      "0011111111100",
+      "0110011110011",
+      "1100001100001",
+      "0011000000110",
+    ],
+    boss: [
+      "000011111111110000",
+      "000111111111111000",
+      "001111011111110100",
+      "011111111111111110",
+      "111101111111111011",
+      "111111111111111111",
+      "110111111111111101",
+      "011110000000001111",
+      "001111000110001111",
+      "000111111111111000",
+    ],
+  };
+
+    const spriteCache = Object.create(null);
+
+  function drawInvader(kind, x, y, scale, fillStyle) {
+    // Cached pixel sprites (much faster than per-frame fillRect loops)
+    const key = kind + "|" + fillStyle;
+    let spr = spriteCache[key];
+    if (!spr) {
+      const pat = SPRITES[kind] || SPRITES.grunt;
+      const w = pat[0].length;
+      const h = pat.length;
+      const c = document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const g = c.getContext("2d");
+      g.imageSmoothingEnabled = false;
+      g.fillStyle = fillStyle;
+      for (let r = 0; r < h; r++) {
+        const row = pat[r];
+        for (let col = 0; col < w; col++) {
+          if (row[col] === "1") g.fillRect(col, r, 1, 1);
+        }
+      }
+      spr = c;
+      spriteCache[key] = spr;
+    }
+    const w = spr.width * scale;
+    const h = spr.height * scale;
+    ctx.drawImage(spr, x - w / 2, y - h / 2, w, h);
+  }
+
+  // ---------- asteroids ----------
+  function genAsteroids() {
+    asteroids = [];
+    const N = 130;
+    const range = 3200;
+    for (let i=0;i<N;i++){
+      const x = rand(-range, range);
+      const y = rand(-range, range);
+      const r = rand(18, 46);
+      // keep a safer spawn area near origin
+      if (Math.hypot(x,y) < 260) { i--; continue; }
+      const ptsN = irand(10, 16);
+      const shape = [];
+      for (let p=0; p<ptsN; p++) {
+        const a = (Math.PI*2) * (p/ptsN) + rand(-0.18, 0.18);
+        const rr = r * rand(0.72, 1.18);
+        shape.push({ a, rr });
+      }
+      shape.sort((u,v)=>u.a - v.a);
+            const shade = rand(0.85, 1.15);
+      const fr = Math.round(68*shade), fg = Math.round(78*shade), fb = Math.round(112*shade);
+      const fill = `rgba(${fr},${fg},${fb},0.92)`;
+      const stroke = `rgba(255,255,255,0.16)`;
+      asteroids.push({ x, y, r, cd: 0, seed: Math.random()*9999, shape, fill, stroke });
+    }
+  }
+
+  // ---------- starfield ----------
+  function genStars() {
+    stars = [];
+    const N = 220;
+    for (let i=0;i<N;i++){
+      stars.push({
+        x: rand(-1,1),
+        y: rand(-1,1),
+        z: rand(0.12, 1.0), // parallax layer
+        a: rand(0.25, 0.95),
+        tw: rand(0.7, 1.6),
+      });
+    }
+  }
+
+  // ---------- enemies ----------
+  function makeEnemy(kind, x, y, scale=1) {
+    if (kind === "boss") {
+      return { kind, x, y, hp: 2000*scale, maxHp: 2000*scale, spd: 68*scale, dmg: 24, touchCd: 0, r: 44, shotCd: 0 };
+    }
+    if (kind === "runner") return { kind, x, y, hp: 24*scale, maxHp: 24*scale, spd: 120*scale, dmg: 10, touchCd: 0, r: 14 };
+    if (kind === "tank")   return { kind, x, y, hp: 75*scale, maxHp: 75*scale, spd: 64*scale,  dmg: 14, touchCd: 0, r: 18 };
+    if (kind === "elite")  return { kind, x, y, hp: 225*scale, maxHp: 225*scale, spd: 82*scale, dmg: 18, touchCd: 0, r: 22 };
+    return { kind: "grunt", x, y, hp: 44*scale, maxHp: 44*scale, spd: 82*scale, dmg: 12, touchCd: 0, r: 16 };
+  }
+
+  function enemyScale() {
+    // scale mostly with player level (more incremental), with a tiny time drift
+    const lv = Math.max(1, player.level);
+    const timeDrift = (t / 180) * 0.06;
+    return 1 + (lv - 1) * 0.12 + timeDrift;
+  }
+
+  function spawnEnemy() {
+    if (arena.active) return; // boss-only arena
+    const angle = rand(0, Math.PI*2);
+    const dist = rand(560, 820);
+    const x = player.x + Math.cos(angle) * dist;
+    const y = player.y + Math.sin(angle) * dist;
+
+    const s = enemyScale();
+    const roll = Math.random();
+    let kind = "grunt";
+    if (roll < 0.22) kind = "runner";
+    else if (roll < 0.37) kind = "tank";
+    enemies.push(makeEnemy(kind, x, y, s));
+  }
+
+  function spawnEliteMaybe() {
+    // milestone-based elite spawns (tied to player level)
+    if (player.level >= nextEliteLevel) {
+      // small randomness so it's not perfectly predictable
+      if (Math.random() < 0.75) {
+        const angle = rand(0, Math.PI*2);
+        const dist = rand(650, 920);
+        enemies.push(makeEnemy("elite",
+          player.x + Math.cos(angle)*dist,
+          player.y + Math.sin(angle)*dist,
+          enemyScale()
+        ));
+        toast("⚠️ Elite invader incoming!");
+      }
+      nextEliteLevel += 6;
+    }
+  }
+
+  function startArena() {
+    arena.active = true;
+    arena.x = player.x;
+    arena.y = player.y;
+    arena.r = 460; // room to maneuver inside
+    arena.wall = 12;
+
+    // purge non-boss enemies so only the boss can be in the arena
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      if (enemies[i].kind !== "boss") enemies.splice(i, 1);
+    }
+    // clear stray shots so the fight starts clean
+    enemyShots = [];
+  }
+
+  function endArena() {
+    arena.active = false;
+  }
+
+  function spawnBossIfNeeded() {
+    if (boss) return;
+    if (player.level >= nextBossLevel) {
+      startArena();
+      const ang = rand(0, Math.PI*2);
+      const dist = arena.r * 0.55;
+      const x = arena.x + Math.cos(ang)*dist;
+      const y = arena.y + Math.sin(ang)*dist;
+      boss = makeEnemy("boss", x, y, enemyScale());
+      enemies.push(boss);
+      toast(`👾 BOSS INCOMING (Level ${nextBossLevel})`);
+      nextBossLevel += 10;
+    }
+  }
+
+
+  // ---------- combat / damage ----------
+  function nearestEnemy(maxRange=1000) {
+    let best = null, bestD2 = maxRange*maxRange;
+    for (const e of enemies) {
+      if (e.dead) continue;
+
+      // keep non-boss outside arena ring
+      if (arena.active && e.kind !== "boss") {
+        const dxA = e.x - arena.x;
+        const dyA = e.y - arena.y;
+        const dA = Math.hypot(dxA, dyA);
+        const inner = arena.r - e.r - 2;
+        if (dA < inner) {
+          const nx = dxA / (dA || 1);
+          const ny = dyA / (dA || 1);
+          e.x = arena.x + nx * inner;
+          e.y = arena.y + ny * inner;
+        }
+      }
+
+      const d2 = dist2(player.x, player.y, e.x, e.y);
+      if (d2 < bestD2) { bestD2 = d2; best = e; }
+    }
+    return best;
+  }
+
+  function damageEnemy(e, dmg, source="") {
+    e.hp -= dmg;
+    pops.push({ kind:"txt", x:e.x, y:e.y - e.r - 6, v:-40, life:0.55, text:String(dmg) });
+
+    if (e.hp <= 0 && !e.dead) {
+      e.dead = true;
+      kills++;
+      sfxEnemyDie(e.kind==="boss");
+      if (e.kind === "boss") {
+        boss = null;
+        endArena();
+        toast("🏆 Boss defeated!");
+        // big XP reward
+        for (let k=0;k<12;k++) {
+          orbsXP.push({ x: e.x + rand(-18,18), y: e.y + rand(-18,18), r: 7, xp: 26 });
+        }
+        // guaranteed rare drop
+        spawnDrop(Math.random()<0.5?"magnet":"nuke", e.x, e.y);
+      }
+      if (e.kind === "elite") elitesKilled++;
+
+      const drops = (e.kind === "elite") ? 4 : (Math.random() < 0.38 ? 2 : 1);
+      for (let i=0;i<drops;i++) {
+        orbsXP.push({
+          x: e.x + rand(-12,12),
+          y: e.y + rand(-12,12),
+          r: 6,
+          xp: (e.kind === "elite") ? 16 : (e.kind === "tank" ? 11 : 8),
+        });
+      }
+    }
+  }
+
+  
+  // ---------- rare drops ----------
+  function spawnDrop(type, x, y) {
+    // type: "magnet" | "heal" | "nuke"
+    const base = { x, y, vx: rand(-30,30), vy: rand(-30,30), life: 18.0 };
+    if (type === "magnet") drops.push({ ...base, type, r: 16 });
+    else if (type === "heal") drops.push({ ...base, type, r: 15 });
+    else if (type === "nuke") drops.push({ ...base, type, r: 17 });
+  }
+
+  function maybeDropPowerup(e) {
+    // rare drops from enemies; elites slightly higher chance
+    const elite = (e.kind === "elite");
+    const roll = Math.random();
+    const p = elite ? 0.080 : 0.028; // overall chance
+    if (roll > p) return;
+
+    // choose which drop (weighted)
+    const r = Math.random();
+    let type = "magnet";
+    if (r < 0.40) type = "magnet";
+    else if (r < 0.75) type = "heal";
+    else type = "nuke";
+
+    spawnDrop(type, e.x, e.y);
+  }
+
+  function activateDrop(type) {
+    if (type === "magnet") {
+      player.pickupBoostTimer = Math.max(player.pickupBoostTimer, 6.5);
+      toast("🧲 Mega Magnet!");
+    } else if (type === "heal") {
+      const heal = Math.ceil(player.maxHp * 0.25);
+      player.hp = clamp(player.hp + heal, 0, player.maxHp);
+      pops.push({ kind:"heal", x:player.x, y:player.y, life:0.35 });
+      toast("💚 +25% Hull Restored!");
+    } else if (type === "nuke") {
+      // big damage to all enemies + flash
+      player.nukeFlash = 0.28;
+      pops.push({ kind:"nuke", x:player.x, y:player.y, life:0.30, r: 1400 });
+      for (const e of enemies) {
+        if (e.dead) continue;
+
+      // keep non-boss outside arena ring
+      if (arena.active && e.kind !== "boss") {
+        const dxA = e.x - arena.x;
+        const dyA = e.y - arena.y;
+        const dA = Math.hypot(dxA, dyA);
+        const inner = arena.r - e.r - 2;
+        if (dA < inner) {
+          const nx = dxA / (dA || 1);
+          const ny = dyA / (dA || 1);
+          e.x = arena.x + nx * inner;
+          e.y = arena.y + ny * inner;
+        }
+      }
+
+        // strong hit: elites survive sometimes
+        const dmg = Math.max(60, Math.round(e.maxHp * (e.kind === "elite" ? 0.70 : 1.05)));
+        damageEnemy(e, dmg, "nuke");
+      }
+      toast("☢️ NUKE!");
+    }
+  }
+function critRoll() {
+    const c = build.bolt.crit;
+    const r = Math.random();
+    return r < c;
+  }
+
+  function shootBolts(fromX, fromY, target, shots, spread) {
+    if (!target) return;
+    const baseAngle = Math.atan2(target.y - fromY, target.x - fromX);
+    const n = shots;
+    for (let i=0;i<n;i++){
+      const offset = (i - (n-1)/2) * spread;
+      const a = baseAngle + offset;
+      bullets.push({
+        kind:"bolt",
+        x: fromX, y: fromY,
+        vx: Math.cos(a) * build.bolt.speed,
+        vy: Math.sin(a) * build.bolt.speed,
+        r: 4.6,
+        dmg: build.bolt.dmg,
+        life: 1.35,
+        pierce: build.bolt.pierce,
+        chain: build.bolt.chain,
+      });
+    }
+  }
+
+  function chainJump(fromEnemy, jumpsLeft, dmg, visited) {
+    if (jumpsLeft <= 0) return;
+    let best = null, bestD2 = 9999999;
+    for (const e of enemies) {
+      if (e.dead) continue;
+
+      // keep non-boss outside arena ring
+      if (arena.active && e.kind !== "boss") {
+        const dxA = e.x - arena.x;
+        const dyA = e.y - arena.y;
+        const dA = Math.hypot(dxA, dyA);
+        const inner = arena.r - e.r - 2;
+        if (dA < inner) {
+          const nx = dxA / (dA || 1);
+          const ny = dyA / (dA || 1);
+          e.x = arena.x + nx * inner;
+          e.y = arena.y + ny * inner;
+        }
+      }
+
+      if (visited.has(e)) continue;
+      const d2 = dist2(fromEnemy.x, fromEnemy.y, e.x, e.y);
+      if (d2 < bestD2 && d2 < 320*320) { bestD2 = d2; best = e; }
+    }
+    if (!best) return;
+    visited.add(best);
+    pops.push({ kind:"boltArc", x1:fromEnemy.x, y1:fromEnemy.y, x2:best.x, y2:best.y, life:0.16 });
+    damageEnemy(best, dmg);
+    chainJump(best, jumpsLeft-1, Math.max(1, Math.round(dmg*0.85)), visited);
+  }
+
+  function firePlayerBolts() {
+    sfxShoot();
+    const target = nearestEnemy(1050);
+    if (!target) return;
+
+    // damage with crit
+    // we apply crit per bullet on hit; store crit chance and mult
+    shootBolts(player.x, player.y, target, build.bolt.shots, build.bolt.spread);
+  }
+
+  function doEMP() {
+    const rad = build.emp.radius;
+    const dmg = build.emp.dmg;
+    pops.push({ kind:"ring", x:player.x, y:player.y, r:rad, life:0.30 });
+
+    for (const e of enemies) {
+      if (e.dead) continue;
+
+      // keep non-boss outside arena ring
+      if (arena.active && e.kind !== "boss") {
+        const dxA = e.x - arena.x;
+        const dyA = e.y - arena.y;
+        const dA = Math.hypot(dxA, dyA);
+        const inner = arena.r - e.r - 2;
+        if (dA < inner) {
+          const nx = dxA / (dA || 1);
+          const ny = dyA / (dA || 1);
+          e.x = arena.x + nx * inner;
+          e.y = arena.y + ny * inner;
+        }
+      }
+
+      const d = Math.hypot(e.x - player.x, e.y - player.y);
+      if (d < rad + e.r) damageEnemy(e, dmg);
+    }
+  }
+
+  function fireDrones(dt) {
+    if (!build.drone.unlocked || build.drone.count <= 0) return;
+    droneTimer -= dt;
+    if (droneTimer > 0) return;
+    droneTimer = build.drone.rate;
+
+    for (let i=0;i<build.drone.count;i++){
+      const a = t*1.2 + i*(Math.PI*2/build.drone.count);
+      const dx = Math.cos(a)*34;
+      const dy = Math.sin(a)*34;
+      const target = nearestEnemy(900);
+      if (!target) continue;
+      bullets.push({
+        kind:"droneBolt",
+        x: player.x + dx, y: player.y + dy,
+        vx: (target.x-(player.x+dx)) / hypot(target.x-(player.x+dx), target.y-(player.y+dy)) * build.drone.speed,
+        vy: (target.y-(player.y+dy)) / hypot(target.x-(player.x+dx), target.y-(player.y+dy)) * build.drone.speed,
+        r: 4.0,
+        dmg: build.drone.dmg,
+        life: 1.4,
+        pierce: 0,
+        chain: 0,
+      });
+    }
+  }
+
+  function fireMissile(dt) {
+    if (!build.missile.unlocked) return;
+    missileTimer -= dt;
+    if (missileTimer > 0) return;
+    missileTimer = Math.max(0.9, build.missile.rate);
+
+    const target = nearestEnemy(1200);
+    if (!target) return;
+    bullets.push({
+      kind:"missile",
+      x: player.x, y: player.y,
+      vx: 0, vy: 0,
+      r: 6.0,
+      dmg: build.missile.dmg,
+      life: 3.0,
+      speed: build.missile.speed,
+      targetId: target._id || (target._id = Math.random().toString(16).slice(2)),
+      radius: build.missile.radius
+    });
+  }
+
+  function fireLaser(dt) {
+    if (!build.laser.unlocked) return;
+    laserTimer -= dt;
+    if (laserTimer > 0) return;
+    laserTimer = Math.max(1.2, build.laser.rate);
+
+    const target = nearestEnemy(1300);
+    if (!target) return;
+
+    // hits everything along line, with pierce limit
+    const ax = player.x, ay = player.y;
+    const bx = target.x, by = target.y;
+    pops.push({ kind:"laser", x1:ax, y1:ay, x2:bx, y2:by, life:0.12, w:build.laser.width });
+
+    // check enemies by distance to segment
+    const pierce = build.laser.pierce;
+    let hits = [];
+    for (const e of enemies) {
+      if (e.dead) continue;
+
+      // keep non-boss outside arena ring
+      if (arena.active && e.kind !== "boss") {
+        const dxA = e.x - arena.x;
+        const dyA = e.y - arena.y;
+        const dA = Math.hypot(dxA, dyA);
+        const inner = arena.r - e.r - 2;
+        if (dA < inner) {
+          const nx = dxA / (dA || 1);
+          const ny = dyA / (dA || 1);
+          e.x = arena.x + nx * inner;
+          e.y = arena.y + ny * inner;
+        }
+      }
+
+      const d = distPointToSegment(e.x, e.y, ax, ay, bx, by);
+      if (d <= e.r + build.laser.width*0.6) hits.push({e, d2: dist2(e.x,e.y,ax,ay)});
+    }
+    hits.sort((a,b)=>a.d2-b.d2);
+    let count = 0;
+    for (const h of hits) {
+      damageEnemy(h.e, build.laser.dmg);
+      count++;
+      if (count > pierce) break;
+    }
+  }
+
+  function distPointToSegment(px, py, ax, ay, bx, by) {
+    const abx = bx-ax, aby = by-ay;
+    const apx = px-ax, apy = py-ay;
+    const ab2 = abx*abx + aby*aby || 1;
+    let t = (apx*abx + apy*aby) / ab2;
+    t = clamp(t, 0, 1);
+    const cx = ax + abx*t, cy = ay + aby*t;
+    return Math.hypot(px-cx, py-cy);
+  }
+
+  // ---------- XP / leveling ----------
+  function gainXP(amount) {
+    player.xp += amount * build.xpGain;
+    while (player.xp >= player.xpToNext) {
+      player.xp -= player.xpToNext;
+      player.level++;
+      player.xpToNext = Math.round(player.xpToNext * 1.18 + 7);
+      openLevelUp();
+    }
+  }
+
+  // ---------- upgrades (with rarities) ----------
+  const UP = () => ([
+    // COMMON
+    mk("bolt_dmg", "Ion Bolts +18% Damage", "Your main bolts hit harder.", "Common", 12, ()=>{ build.bolt.dmg = Math.round(build.bolt.dmg*1.18); build.bolt.lvl++; }),
+    mk("bolt_rate", "Ion Bolts -10% Cooldown", "Shoot bolts more often.", "Common", 10, ()=>{ build.bolt.rate = Math.max(0.14, build.bolt.rate*0.90); build.bolt.lvl++; }),
+    mk("boots", "Thrusters +8% Speed", "Move faster to kite invaders.", "Common", 10, ()=>{ player.spd = Math.min(420, player.spd*1.08); }),
+    mk("maxhp", "Hull +20 Max HP", "More survivability.", "Common", 12, ()=>{ player.maxHp += 20; player.hp += 20; }),
+    mk("pickup", "Magnet +20 Radius", "Collect XP from farther away.", "Common", 12, ()=>{ player.pickup = Math.min(280, player.pickup + 20); }),
+    mk("regen", "Nanites +0.9/sec", "Slow healing over time.", "Common", 10, ()=>{ player.regen += 0.9; }),
+    mk("armor", "Plating +1 Armor", "Reduce contact damage.", "Common", 8, ()=>{ build.armor = Math.min(9, (build.armor||0) + 1); }),
+
+    // UNCOMMON
+    mk("multishot", "Extra Bolt (+1)", "Adds one more bolt per volley.", "Uncommon", 6, ()=>{ build.bolt.shots = Math.min(8, build.bolt.shots+1); build.bolt.spread = Math.min(0.26, build.bolt.spread + 0.02); }),
+    mk("pierce", "Bolt Pierce +1", "Bolts pass through more invaders.", "Uncommon", 5, ()=>{ build.bolt.pierce = Math.min(6, build.bolt.pierce+1); }),
+    mk("crit", "Crit Chance +4%", "Bolts sometimes crit for extra damage.", "Uncommon", 7, ()=>{ build.bolt.crit = Math.min(0.40, build.bolt.crit + 0.04); }),
+    mk("critMult", "Crit Damage +20%", "Crits hit much harder.", "Uncommon", 6, ()=>{ build.bolt.critMult = Math.min(3.2, build.bolt.critMult + 0.20); }),
+    mk("xp", "XP Gain +12%", "Level up faster.", "Uncommon", 8, ()=>{ build.xpGain = Math.min(2.2, build.xpGain * 1.12); }),
+    mk("dust", "Stardust Gain +15%", "Earn more Stardust at the end of runs.", "Uncommon", 8, ()=>{ build.dustGain = Math.min(2.5, build.dustGain * 1.15); }),
+
+    // RARE (weapon unlocks)
+    mk("orbs_unlock", "Plasma Orbs", "Summon orbiting plasma orbs that deal contact damage.", "Rare", 1, ()=>{ build.orbs.unlocked=true; build.orbs.count = Math.max(2, build.orbs.count+2); build.orbs.lvl = Math.max(1, build.orbs.lvl+1); }),
+    mk("emp_unlock", "EMP Pulse", "Periodically blasts a damaging shockwave around you.", "Rare", 1, ()=>{ build.emp.unlocked=true; build.emp.lvl = Math.max(1, build.emp.lvl+1); }),
+    mk("drone_unlock", "Gun Drone", "A drone fires at nearby invaders.", "Rare", 1, ()=>{ build.drone.unlocked=true; build.drone.count = Math.max(1, build.drone.count+1); build.drone.lvl = Math.max(1, build.drone.lvl+1); }),
+    mk("missile_unlock", "Homing Missiles", "Launch missiles that explode on impact.", "Rare", 1, ()=>{ build.missile.unlocked=true; build.missile.lvl = Math.max(1, build.missile.lvl+1); }),
+    mk("shield_unlock", "Shield Module", "Gain a rechargeable shield charge that blocks one hit.", "Rare", 1, ()=>{ unlockShield(); }),
+
+    // EPIC (weapon scaling)
+    mk("orbs_more", "More Orbs (+1)", "Add another orbiting plasma orb.", "Epic", 6, ()=>{ build.orbs.unlocked=true; build.orbs.count = Math.min(8, build.orbs.count+1); build.orbs.dmg = Math.round(build.orbs.dmg*1.12); build.orbs.lvl++; }),
+    mk("orbs_spin", "Orbs Spin +20%", "Orbit faster and tag enemies more.", "Epic", 5, ()=>{ build.orbs.spin = Math.min(6.0, build.orbs.spin*1.20); build.orbs.lvl++; }),
+    mk("emp_power", "EMP Damage +35%", "Bigger pulses, bigger pain.", "Epic", 6, ()=>{ build.emp.unlocked=true; build.emp.dmg = Math.round(build.emp.dmg*1.35); build.emp.radius = Math.min(170, build.emp.radius + 10); build.emp.lvl++; }),
+    mk("emp_rate", "EMP -18% Cooldown", "Pulse more frequently.", "Epic", 6, ()=>{ build.emp.unlocked=true; build.emp.baseRate = Math.max(2.0, build.emp.baseRate*0.82); build.emp.lvl++; }),
+    mk("drone_more", "More Drones (+1)", "More barrels = more bolts.", "Epic", 4, ()=>{ build.drone.unlocked=true; build.drone.count = Math.min(4, build.drone.count+1); build.drone.dmg = Math.round(build.drone.dmg*1.18); build.drone.lvl++; }),
+    mk("missile_blast", "Missile Blast +25%", "Bigger explosions and damage.", "Epic", 5, ()=>{ build.missile.unlocked=true; build.missile.dmg = Math.round(build.missile.dmg*1.25); build.missile.radius = Math.min(150, build.missile.radius + 10); build.missile.lvl++; }),
+    mk("laser_unlock", "Prism Laser", "Fires a piercing laser burst at targets.", "Epic", 1, ()=>{ build.laser.unlocked=true; build.laser.lvl = Math.max(1, build.laser.lvl+1); }),
+
+    // LEGENDARY (specials)
+    mk("chain", "Chain Lightning +1", "Bolts jump to nearby invaders after a hit.", "Legendary", 3, ()=>{ build.bolt.chain = Math.min(4, build.bolt.chain+1); }),
+    mk("slowField", "Gravity Well", "Nearby enemies are slowed.", "Legendary", 5, ()=>{ build.slowField.unlocked=true; build.slowField.lvl++; build.slowField.slow = Math.min(0.45, build.slowField.slow + 0.06); build.slowField.radius = Math.min(220, build.slowField.radius + 12); }),
+    mk("laser_power", "Laser +35% Damage", "Prism laser hits harder and pierces more.", "Legendary", 4, ()=>{ build.laser.unlocked=true; build.laser.dmg = Math.round(build.laser.dmg*1.35); build.laser.pierce = Math.min(6, build.laser.pierce+1); build.laser.lvl++; }),
+    mk("shield_plus", "Shield +1 Charge", "Hold more shield charges.", "Legendary", 2, ()=>{ unlockShield(); player.shield.maxCharges = Math.min(3, player.shield.maxCharges+1); player.shield.charges = Math.min(player.shield.maxCharges, player.shield.charges+1); }),
+
+    // MYTHIC
+    mk("overclock", "Overclock", "All weapon cooldowns -10% (stacking).", "Mythic", 4, ()=>{ build.bolt.rate = Math.max(0.12, build.bolt.rate*0.90); build.emp.baseRate = Math.max(1.9, build.emp.baseRate*0.90); build.drone.rate = Math.max(0.35, build.drone.rate*0.90); build.missile.rate = Math.max(0.8, build.missile.rate*0.90); build.laser.rate = Math.max(0.9, build.laser.rate*0.90); }),
+    mk("megahull", "Mega Hull", "+18% Max HP and +1 Armor.", "Mythic", 2, ()=>{ const add = Math.round(player.maxHp*0.18); player.maxHp += add; player.hp += add; build.armor = Math.min(9, (build.armor||0)+1); }),
+    mk("bolt_focus", "Bolt Focus", "Bolts +25% speed, +1 pierce, tighter spread.", "Mythic", 2, ()=>{ build.bolt.speed = Math.min(900, build.bolt.speed*1.25); build.bolt.pierce = Math.min(6, build.bolt.pierce+1); build.bolt.spread = Math.max(0.10, build.bolt.spread-0.03); }),
+
+    // ETHEREAL
+    mk("ethereal_magnet", "Ethereal Magnet", "Massive pickup radius +120 and XP gain +25%.", "Ethereal", 1, ()=>{ player.pickup = Math.min(340, player.pickup + 120); build.xpGain = Math.min(2.5, build.xpGain*1.25); }),
+    mk("ethereal_wrath", "Starfire Wrath", "EMP triggers a mini-laser burst on every pulse.", "Ethereal", 1, ()=>{ build.emp.unlocked=true; build.emp._wrath = true; }),
+  ]);
+
+  function mk(id, name, desc, rarity, max, apply) {
+    return { id, name, desc, rarity, max, apply };
+  }
+
+  const picked = new Map(); // upgrade id -> levels in this run
+  let offer = [];
+
+  function canOffer(u) {
+    const lv = picked.get(u.id) || 0;
+    if (lv >= u.max) return false;
+    // hide some upgrades unless relevant
+    if (u.id.startsWith("orbs_") && !build.orbs.unlocked && u.id !== "orbs_unlock") return false;
+    if (u.id.startsWith("emp_") && !build.emp.unlocked && u.id !== "emp_unlock") return false;
+    if (u.id.startsWith("drone_") && !build.drone.unlocked && u.id !== "drone_unlock") return false;
+    if (u.id.startsWith("missile_") && !build.missile.unlocked && u.id !== "missile_unlock") return false;
+    if (u.id.startsWith("laser_") && !build.laser.unlocked && u.id !== "laser_unlock") return false;
+    if (u.id === "shield_plus" && !player.shield.unlocked) return false;
+    return true;
+  }
+
+  function openLevelUp() {
+    state = "LEVELUP";
+    levelUpOverlay.style.display = "flex";
+
+    const pool = UP().filter(canOffer);
+    const chosen = [];
+    const luck = player.luck;
+
+    for (let slot=0; slot<3; slot++) {
+      const desired = rollRarity(luck);
+      let rIndex = RARITIES.indexOf(desired);
+      let pick = null;
+
+      while (rIndex >= 0 && !pick) {
+        const rName = RARITIES[rIndex];
+        const candidates = pool.filter(u => u.rarity === rName && !chosen.some(c=>c.id===u.id));
+        if (candidates.length) {
+          pick = candidates[irand(0, candidates.length-1)];
+          break;
+        }
+        rIndex--;
+      }
+      // fallback: anything not chosen
+      if (!pick) {
+        const candidates = pool.filter(u => !chosen.some(c=>c.id===u.id));
+        pick = candidates.length ? candidates[irand(0, candidates.length-1)] : null;
+      }
+      if (pick) chosen.push(pick);
+    }
+
+    offer = chosen;
+
+    cardsEl.innerHTML = "";
+    offer.forEach((upg, i) => {
+      const div = document.createElement('div');
+      div.className = "card";
+      div.style.background = RARITY_COLORS[upg.rarity] || "rgba(255,255,255,.06)";
+      div.innerHTML = `
+        <div class="t">
+          <span>${i+1}. ${upg.name}</span>
+          <span class="rar">${upg.rarity}</span>
+        </div>
+        <div class="d">${upg.desc}</div>
+      `;
+      div.onclick = () => pickUpgrade(i);
+      cardsEl.appendChild(div);
+    });
+  }
+
+  function pickUpgrade(i) {
+    if (state !== "LEVELUP") return;
+    const upg = offer[i];
+    if (!upg) return;
+    upg.apply();
+    picked.set(upg.id, (picked.get(upg.id)||0)+1);
+
+    levelUpOverlay.style.display = "none";
+    state = "PLAY";
+    toast(`Picked: ${upg.name} (${upg.rarity})`);
+  }
+
+  function unlockShield() {
+    player.shield.unlocked = true;
+    player.shield.maxCharges = Math.max(player.shield.maxCharges, 1);
+    player.shield.charges = Math.max(player.shield.charges, 1);
+    player.shield.recharge = Math.max(player.shield.recharge, 9.0); // seconds per charge
+  }
+
+  // ---------- movement ----------
+  function getMoveVec() {
+    let mx = 0, my = 0;
+    if (keys.has('w') || keys.has('arrowup')) my -= 1;
+    if (keys.has('s') || keys.has('arrowdown')) my += 1;
+    if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
+    if (keys.has('d') || keys.has('arrowright')) mx += 1;
+
+    // Touch joystick overrides/augments keyboard when active
+    if (touchStick.active && (touchStick.mag > 0.02)) {
+      mx = touchStick.mx;
+      my = touchStick.my;
+    }
+
+    const l = Math.hypot(mx, my);
+    if (l > 0) { mx /= l; my /= l; }
+    return { mx, my };
+  }
+
+  // ---------- toast ----------
+  let toastTimer = 0;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastTimer = 2.2;
+    toastEl.style.opacity = "0.9";
+  }
+
+  // ---------- pause ----------
+  function togglePause() {
+    if (state === "PLAY") { state = "PAUSE"; toast("Paused (P)"); }
+    else if (state === "PAUSE") { state = "PLAY"; toast("Unpaused"); }
+  }
+
+  // ---------- run flow ----------
+  function setState(newState) {
+    state = newState;
+    menuOverlay.style.display = (state==="MENU") ? "flex" : "none";
+    metaOverlay.style.display = (state==="META") ? "flex" : "none";
+    levelUpOverlay.style.display = (state==="LEVELUP") ? "flex" : "none";
+    gameOverOverlay.style.display = (state==="GAMEOVER") ? "flex" : "none";
+    hud.style.display = (state==="PLAY"||state==="PAUSE"||state==="LEVELUP") ? "block" : "none";
+  
+    updateMusic();
+  }
+
+  function applyMeta() {
+    const m = save.meta;
+
+    player.maxHp += (m.hp||0) * 15;
+    player.hp = player.maxHp;
+    player.spd *= (1 + (m.spd||0) * 0.04);
+    player.pickup += (m.pickup||0) * 10;
+    player.regen += (m.regen||0) * 0.6;
+    player.luck += (m.luck||0);
+    build.armor = (build.armor||0) + (m.armor||0);
+
+    const dmgBonus = 1 + (m.dmg||0) * 0.06;
+    build.bolt.dmg = Math.round(build.bolt.dmg * dmgBonus);
+    build.orbs.dmg = Math.round(build.orbs.dmg * dmgBonus);
+    build.emp.dmg = Math.round(build.emp.dmg * dmgBonus);
+    build.drone.dmg = Math.round(build.drone.dmg * dmgBonus);
+    build.missile.dmg = Math.round(build.missile.dmg * dmgBonus);
+    build.laser.dmg = Math.round(build.laser.dmg * dmgBonus);
+
+    if ((m.startDrone||0) > 0) { build.drone.unlocked=true; build.drone.count=1; build.drone.lvl=1; }
+    if ((m.startShield||0) > 0) { unlockShield(); }
+  }
+
+  function startRun() {
+    // reset everything for new run
+    t = 0; kills = 0; elitesKilled = 0; stardustEarned = 0;
+    nextEliteLevel = 6;
+    nextBossLevel = 10;
+    boss = null;
+    arena.active = false;
+    player = basePlayer();
+    build = baseBuild();
+    enemies = [];
+    bullets = [];
+    enemyShots = [];
+    orbsXP = [];
+    pops = [];
+    drops = [];
+    picked.clear();
+
+    boltTimer = 0;
+    empTimer = 1.6;
+    droneTimer = 0.7;
+    missileTimer = 1.2;
+    laserTimer = 2.0;
+    spawnTimer = 0;
+
+    genStars();
+    genAsteroids();
+
+    applyMeta();
+
+    // start level meta: grant a few quick level-ups without rolling XP
+    const startLv = clamp(save.meta.startLevel||0, 0, 3);
+    for (let i=0;i<startLv;i++){
+      player.level++;
+      openLevelUp();
+      // immediately pause for choice; the first choice appears instantly and you pick normally
+      // after picking, it continues; repeated loop isn't great, so break and let player pick naturally
+      // We'll handle by forcing extra levels via xp later.
+      break;
+    }
+    // if startLevel > 1, we queue extra levels via xp
+    if (startLv > 1) {
+      // give enough XP to trigger remaining level-ups after first pick
+      const extra = startLv - 1;
+      player.xp += player.xpToNext * extra;
+    }
+
+    runTag.textContent = "";
+    setState("PLAY");
+  }
+
+  function endRun() {
+    // compute stardust
+    const timePts = Math.floor(t / 12);
+    const killPts = Math.floor(kills / 4);
+    const levelPts = Math.max(0, (player.level - 1) * 2);
+    const elitePts = elitesKilled * 6;
+    const base = timePts + killPts + levelPts + elitePts;
+    const earned = Math.max(0, Math.floor(base * build.dustGain));
+    stardustEarned = earned;
+
+    save.stardust += earned;
+
+    // best stats
+    save.best.time = Math.max(save.best.time, t);
+    save.best.level = Math.max(save.best.level, player.level);
+    save.best.kills = Math.max(save.best.kills, kills);
+
+    writeSave();
+
+    gameOverText.innerHTML = `
+      Time Survived: <b>${formatTime(t)}</b><br/>
+      Level: <b>${player.level}</b> • Kills: <b>${kills}</b> • Elites: <b>${elitesKilled}</b><br/>
+      Stardust Earned: <b>${earned} ✦</b><br/><br/>
+      Best Time: <b>${formatTime(save.best.time)}</b> • Best Level: <b>${save.best.level}</b> • Best Kills: <b>${save.best.kills}</b>
+    `;
+    setState("GAMEOVER");
+  }
+
+  // ---------- UI buttons ----------
+  playBtn.onclick = () => { userGestureAudio(); startRun(); };
+  metaBtn.onclick = () => { userGestureAudio(); renderShop(); setState("META"); };
+  backToMenuBtn.onclick = () => { userGestureAudio(); setState("MENU"); };
+  wipeBtn.onclick = () => {
+    if (confirm("Reset Stardust and all meta upgrades?")) resetSave();
+  };
+
+  restartBtn.onclick = () => { userGestureAudio(); startRun(); };
+  toMenuBtn.onclick = () => { userGestureAudio(); setState("MENU"); };
+  toMetaBtn.onclick = () => { userGestureAudio(); renderShop(); setState("META"); };
+
+  // ---------- update loop ----------
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = clamp((now - last) / 1000, 0, 0.05);
+    last = now;
+
+    if (state === "PLAY") update(dt);
+    if (state === "PAUSE") { /* no update */ }
+
+    render(dt);
+
+    // toast fade
+    toastTimer = Math.max(0, toastTimer - dt);
+    if (toastTimer <= 0) toastEl.style.opacity = "0";
+
+  }
+
+  function update(dt) {
+    t += dt;
+
+    // audio rate-limits
+    dieSfxCd = Math.max(0, dieSfxCd - dt);
+
+    // regen + invuln
+    player.hp = clamp(player.hp + player.regen * dt, 0, player.maxHp);
+    player.invuln = Math.max(0, player.invuln - dt);
+    player.asteroidCd = Math.max(0, player.asteroidCd - dt);
+
+    // shield recharge
+    if (player.shield.unlocked) {
+      player.shield.cd = Math.max(0, player.shield.cd - dt);
+      if (player.shield.charges < player.shield.maxCharges) {
+        player.shield.cd -= dt;
+        if (player.shield.cd <= 0) {
+          player.shield.charges++;
+          player.shield.cd = player.shield.recharge;
+          pops.push({ kind:"shield", x:player.x, y:player.y, life:0.35 });
+        }
+      }
+      if (player.shield.cd <= 0 && player.shield.charges < player.shield.maxCharges) {
+        player.shield.cd = player.shield.recharge;
+      }
+    }
+
+    // movement (space drift)
+    const { mx, my } = getMoveVec();
+    const inputMag = Math.hypot(mx, my);
+    const accel = 860; // thrust
+    if (inputMag > 0) {
+      player.vx += mx * accel * dt;
+      player.vy += my * accel * dt;
+    }
+    // tiny drag so it doesn't drift forever, but mostly keeps going straight
+    const drag = inputMag > 0 ? 0.08 : 0.025;
+    const keep = Math.max(0, 1 - drag * dt);
+    player.vx *= keep;
+    player.vy *= keep;
+    // clamp to max speed (player.spd acts as max velocity)
+    const v = Math.hypot(player.vx, player.vy);
+    const maxV = Math.max(60, (player.spd||0));
+    if (v > maxV) {
+      player.vx = (player.vx / v) * maxV;
+      player.vy = (player.vy / v) * maxV;
+    }
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+
+    // smooth ship turning: face thrust direction when pushing, otherwise face drift direction
+    let targetAng = player.angle;
+    if (inputMag > 0) targetAng = Math.atan2(my, mx);
+    else if (v > 8) targetAng = Math.atan2(player.vy, player.vx);
+    const turnT = 1 - Math.exp(-10 * dt);
+    player.angle = lerpAngle(player.angle, targetAng, turnT);
+
+
+    // arena wall (boss fights): keep player inside a ring
+    if (arena.active) {
+      const dxA = player.x - arena.x;
+      const dyA = player.y - arena.y;
+      const dA = Math.hypot(dxA, dyA);
+      const limit = arena.r - player.r;
+      if (dA > limit) {
+        const nx = dxA / (dA || 1);
+        const ny = dyA / (dA || 1);
+        player.x = arena.x + nx * limit;
+        player.y = arena.y + ny * limit;
+        // remove outward velocity so you slide along the wall
+        const out = player.vx*nx + player.vy*ny;
+        if (out > 0) { player.vx -= out*nx; player.vy -= out*ny; }
+      }
+    }
+
+    // spawn pacing (scales primarily with player level)
+    const lv = Math.max(1, player.level);
+    const targetFromLevel = 10 + Math.floor(lv * 2.2);
+    const targetFromTime = 10 + Math.floor(t / 28); // gentle baseline so it still ramps a bit
+    let targetEnemies = Math.max(targetFromLevel, targetFromTime);
+    // boss-only arena: no regular enemies spawn while the arena is active
+    if (arena.active) targetEnemies = (boss ? 1 : 0);
+    else if (boss) targetEnemies = Math.min(targetEnemies, 8);
+
+    const spawnRate = clamp(0.56 - (lv-1) * 0.012, 0.16, 0.56);
+    spawnTimer -= dt;
+    if (enemies.length < targetEnemies) {
+      while (spawnTimer <= 0) {
+        spawnEnemy();
+        spawnTimer += spawnRate;
+      }
+    } else {
+      // don't accumulate huge negative timers while at cap
+      spawnTimer = Math.max(spawnTimer, 0.06);
+    }
+    spawnEliteMaybe();
+    spawnBossIfNeeded();
+
+    // slow field
+    const slowOn = build.slowField.unlocked;
+    const slowR = build.slowField.radius;
+    const slowAmt = build.slowField.slow;
+
+    // auto fire
+    boltTimer -= dt;
+    if (boltTimer <= 0) {
+      firePlayerBolts();
+      boltTimer = build.bolt.rate;
+    }
+
+    // EMP
+    if (build.emp.unlocked) {
+      empTimer -= dt;
+      if (empTimer <= 0) {
+        doEMP();
+        if (build.emp._wrath) {
+          // mini laser burst to nearest enemy
+          const target = nearestEnemy(1400);
+          if (target) {
+            pops.push({ kind:"laser", x1:player.x, y1:player.y, x2:target.x, y2:target.y, life:0.10, w:8 });
+            damageEnemy(target, Math.round(build.laser.dmg*0.65));
+          }
+        }
+        empTimer = Math.max(1.9, build.emp.baseRate - build.emp.lvl*0.18);
+      }
+    }
+
+    // other weapons
+    fireDrones(dt);
+    fireMissile(dt);
+    fireLaser(dt);
+
+    // bullets update
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.life -= dt;
+
+      if (b.kind === "missile") {
+        // home toward nearest matching target; if missing, use nearest enemy
+        let target = null;
+        for (const e of enemies) { if (!e.dead && e._id === b.targetId) { target = e; break; } }
+        if (!target) target = nearestEnemy(1400);
+        if (target) {
+          const dx = target.x - b.x, dy = target.y - b.y;
+          const L = hypot(dx, dy);
+          const vx = (dx/L) * b.speed;
+          const vy = (dy/L) * b.speed;
+          // smooth steering
+          b.vx = lerp(b.vx, vx, 0.10);
+          b.vy = lerp(b.vy, vy, 0.10);
+        }
+      }
+
+      b.x += (b.vx||0) * dt;
+      b.y += (b.vy||0) * dt;
+
+      // collisions with enemies
+      for (let j = enemies.length - 1; j >= 0; j--) {
+        const e = enemies[j];
+        if (e.dead) continue;
+
+      // keep non-boss outside arena ring
+      if (arena.active && e.kind !== "boss") {
+        const dxA = e.x - arena.x;
+        const dyA = e.y - arena.y;
+        const dA = Math.hypot(dxA, dyA);
+        const inner = arena.r - e.r - 2;
+        if (dA < inner) {
+          const nx = dxA / (dA || 1);
+          const ny = dyA / (dA || 1);
+          e.x = arena.x + nx * inner;
+          e.y = arena.y + ny * inner;
+        }
+      }
+
+        const rr = (b.r||4) + e.r;
+        if (dist2(b.x, b.y, e.x, e.y) <= rr*rr) {
+          if (b.kind === "missile") {
+            // explosion
+            pops.push({ kind:"boom", x:b.x, y:b.y, r:b.radius, life:0.22 });
+            for (const ee of enemies) {
+              if (ee.dead) continue;
+              const d = Math.hypot(ee.x - b.x, ee.y - b.y);
+              if (d <= b.radius + ee.r) damageEnemy(ee, b.dmg);
+            }
+            b.life = 0;
+            break;
+          } else {
+            // bolt or drone bolt
+            let dmg = b.dmg;
+            if (b.kind === "bolt" && critRoll()) dmg = Math.round(dmg * build.bolt.critMult);
+            damageEnemy(e, dmg);
+
+            // chain lightning
+            if ((b.chain||0) > 0) {
+              const visited = new Set([e]);
+              chainJump(e, b.chain, Math.max(1, Math.round(dmg*0.65)), visited);
+            }
+
+            if ((b.pierce||0) > 0) b.pierce--;
+            else { b.life = 0; break; }
+          }
+        }
+      }
+
+      if (b.life <= 0) bullets.splice(i, 1);
+    }
+
+    // enemy shots update
+    for (let i = enemyShots.length - 1; i >= 0; i--) {
+      const s = enemyShots[i];
+      s.life -= dt;
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+      const rr = s.r + player.r;
+      if (player.invuln <= 0 && dist2(s.x, s.y, player.x, player.y) <= rr*rr) {
+        if (player.shield.unlocked && player.shield.charges > 0) {
+          player.shield.charges--;
+          player.invuln = 0.25;
+          pops.push({ kind:"shieldHit", x:player.x, y:player.y, life:0.22 });
+        } else {
+          player.hp -= Math.max(1, s.dmg - (build.armor||0));
+          player.invuln = 0.35;
+          pops.push({ kind:"hit", x:player.x, y:player.y, life:0.18 });
+          if (player.hp <= 0) { sfxPlayerDie(); return endRun(); }
+        }
+        s.life = 0;
+      }
+      if (s.life <= 0) enemyShots.splice(i, 1);
+    }
+
+    // enemies update + collisions
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      const e = enemies[i];
+      if (e.dead) { enemies.splice(i, 1); continue; }
+
+      // boss projectile attack
+      if (e.kind === "boss") {
+        e.shotCd = Math.max(0, (e.shotCd||0) - dt);
+        if (e.shotCd <= 0) {
+          e.shotCd = Math.max(0.75, 2.2 - (player.level*0.03));
+          const baseA = Math.atan2(player.y - e.y, player.x - e.x);
+          const fan = 0.26;
+          for (let k=-2;k<=2;k++) {
+            const a = baseA + k*fan;
+            enemyShots.push({ x:e.x, y:e.y, vx:Math.cos(a)*270, vy:Math.sin(a)*270, r:5.2, life:2.6, dmg:15 });
+          }
+        }
+      }
+
+      // move toward player
+      const dx = player.x - e.x, dy = player.y - e.y;
+      const d = hypot(dx, dy);
+      let spd = e.spd;
+
+      if (slowOn) {
+        const dd = Math.hypot(e.x-player.x, e.y-player.y);
+        if (dd < slowR) spd *= (1 - slowAmt);
+      }
+
+      e.x += (dx / d) * spd * dt;
+      e.y += (dy / d) * spd * dt;
+
+      // touch damage cooldown
+      e.touchCd = Math.max(0, e.touchCd - dt);
+      const rr = e.r + player.r;
+      if (dist2(e.x, e.y, player.x, player.y) <= rr*rr) {
+        if (e.touchCd <= 0 && player.invuln <= 0) {
+          // shield takes hit first
+          if (player.shield.unlocked && player.shield.charges > 0) {
+            player.shield.charges--;
+            player.invuln = 0.25;
+            e.touchCd = 0.50;
+            pops.push({ kind:"shieldHit", x:player.x, y:player.y, life:0.22 });
+          } else {
+            const raw = e.dmg;
+            const reduced = Math.max(1, raw - (build.armor||0));
+            player.hp -= reduced;
+            player.invuln = 0.35;
+            e.touchCd = 0.55;
+            pops.push({ kind:"hit", x:player.x, y:player.y, life:0.18 });
+            if (player.hp <= 0) { sfxPlayerDie(); return endRun(); }
+          }
+        }
+      }
+    }
+
+    // plasma orbs (orbiting weapon)
+    if (build.orbs.unlocked && build.orbs.count > 0) {
+      const count = build.orbs.count;
+      for (let k=0;k<count;k++){
+        const a = t * build.orbs.spin + (k * (Math.PI*2 / count));
+        const bx = player.x + Math.cos(a) * build.orbs.radius;
+        const by = player.y + Math.sin(a) * build.orbs.radius;
+        const br = 8.0;
+
+        for (const e of enemies) {
+          if (e.dead) continue;
+
+      // keep non-boss outside arena ring
+      if (arena.active && e.kind !== "boss") {
+        const dxA = e.x - arena.x;
+        const dyA = e.y - arena.y;
+        const dA = Math.hypot(dxA, dyA);
+        const inner = arena.r - e.r - 2;
+        if (dA < inner) {
+          const nx = dxA / (dA || 1);
+          const ny = dyA / (dA || 1);
+          e.x = arena.x + nx * inner;
+          e.y = arena.y + ny * inner;
+        }
+      }
+
+          const rr = br + e.r;
+          if (dist2(bx, by, e.x, e.y) <= rr*rr) {
+            e._orbCd = Math.max(0, (e._orbCd || 0) - dt);
+            if (e._orbCd <= 0) {
+              damageEnemy(e, build.orbs.dmg);
+              e._orbCd = build.orbs.tick;
+            }
+          }
+        }
+      }
+    }
+
+    // asteroid collision (10% max HP), stationary
+    if (player.asteroidCd <= 0 && player.invuln <= 0) {
+      for (const a of asteroids) {
+        const rr = a.r + player.r;
+        if (dist2(player.x, player.y, a.x, a.y) <= rr*rr) {
+          sfxAsteroidHit();
+          // push out
+          const dx = player.x - a.x, dy = player.y - a.y;
+          const d = hypot(dx, dy);
+          const push = rr - d + 1;
+          player.x += (dx / d) * push;
+          player.y += (dy / d) * push;
+
+          const dmg = Math.max(1, Math.ceil(player.maxHp * 0.10));
+          if (player.shield.unlocked && player.shield.charges > 0) {
+            player.shield.charges--;
+            pops.push({ kind:"shieldHit", x:player.x, y:player.y, life:0.22 });
+          } else {
+            player.hp -= dmg;
+            pops.push({ kind:"asterHit", x:player.x, y:player.y, life:0.26 });
+            if (player.hp <= 0) { sfxPlayerDie(); return endRun(); }
+          }
+          player.asteroidCd = 0.9;
+          player.invuln = 0.20;
+          toast("☄️ Asteroid hit!");
+          break;
+        }
+      }
+    }
+
+    // drops pickup
+    for (let i = drops.length - 1; i >= 0; i--) {
+      const d = drops[i];
+      d.life -= dt;
+      // floaty drift + mild damping
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.vx *= Math.max(0, 1 - 0.9*dt);
+      d.vy *= Math.max(0, 1 - 0.9*dt);
+      // slight magnetism toward player (so it feels nice)
+      const dd = Math.hypot(player.x - d.x, player.y - d.y);
+      if (dd < 240) {
+        const ax = (player.x - d.x) / hypot(player.x - d.x, player.y - d.y);
+        const ay = (player.y - d.y) / hypot(player.x - d.x, player.y - d.y);
+        const sp = 120 + (240 - dd) * 3.0;
+        d.x += ax * sp * dt;
+        d.y += ay * sp * dt;
+      }
+      if (dd < player.r + d.r + 6) {
+        activateDrop(d.type);
+        drops.splice(i, 1);
+        continue;
+      }
+      if (d.life <= 0) drops.splice(i, 1);
+    }
+
+    // XP pickups
+    const pullR = player.pickup + (player.pickupBoostTimer > 0 ? 220 : 0);
+    const pullR2 = pullR * pullR;
+    for (let i = orbsXP.length - 1; i >= 0; i--) {
+      const o = orbsXP[i];
+      const dx = player.x - o.x, dy = player.y - o.y;
+      const d2 = dx*dx + dy*dy;
+
+      if (d2 < pullR2) {
+        const d = Math.sqrt(d2) || 1;
+        const sp = (player.pickupBoostTimer > 0 ? 1100 : 380) + (pullR - d) * (player.pickupBoostTimer > 0 ? 6.5 : 2.4);
+        o.x += (dx / d) * sp * dt;
+        o.y += (dy / d) * sp * dt;
+      }
+      const pickR = player.r + o.r + 4;
+      if (d2 < pickR*pickR) {
+        gainXP(o.xp);
+        orbsXP.splice(i, 1);
+      }
+    }
+
+    // pops update
+    for (let i = pops.length - 1; i >= 0; i--) {
+      const p = pops[i];
+      p.life -= dt;
+      if (p.kind === "txt") p.y += p.v * dt;
+      if (p.life <= 0) pops.splice(i, 1);
+    }
+    // PERF caps (avoid runaway entity counts)
+    if (orbsXP.length > PERF.maxOrbs) orbsXP.length = PERF.maxOrbs;
+    if (pops.length > PERF.maxPops) pops.length = PERF.maxPops;
+    if (bullets.length > PERF.maxBullets) bullets.splice(0, bullets.length - PERF.maxBullets);
+    if (enemyShots.length > PERF.maxEnemyShots) enemyShots.splice(0, enemyShots.length - PERF.maxEnemyShots);
+    if (drops.length > PERF.maxDrops) drops.splice(0, drops.length - PERF.maxDrops);
+
+  }
+
+  // ---------- render ----------
+  function render(dt) {
+    const cw = innerWidth, ch = innerHeight;
+    const camX = player.x - cw/2;
+    const camY = player.y - ch/2;
+
+    const margin = 160;
+    const vx0 = camX - margin, vx1 = camX + cw + margin;
+    const vy0 = camY - margin, vy1 = camY + ch + margin;
+    const inView = (x, y, r=0) => (x + r > vx0 && x - r < vx1 && y + r > vy0 && y - r < vy1);
+
+    // background fill
+    ctx.fillStyle = "#070a12";
+    ctx.fillRect(0, 0, cw, ch);
+
+    // starfield parallax
+    ctx.save();
+    for (const s of stars) {
+      const sx = (cw/2) + (s.x * cw * 0.65) - (camX * s.z * 0.04);
+      const sy = (ch/2) + (s.y * ch * 0.65) - (camY * s.z * 0.04);
+      const tw = 0.6 + 0.4*Math.sin((t*s.tw) + s.x*9.3 + s.y*4.1);
+      ctx.globalAlpha = clamp(s.a*tw, 0.06, 0.95);
+      ctx.fillStyle = "rgba(210,235,255,1)";
+      ctx.fillRect((sx%cw+cw)%cw, (sy%ch+ch)%ch, 2, 2);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    // world
+    ctx.save();
+    ctx.translate(-camX, -camY);
+
+    // neon grid (astro-party vibe)
+    ctx.globalAlpha = 0.10;
+    ctx.strokeStyle = "rgba(120,228,255,1)";
+    ctx.lineWidth = 1;
+    const grid = 90;
+    const gx0 = Math.floor((camX - 200)/grid)*grid;
+    const gy0 = Math.floor((camY - 200)/grid)*grid;
+    for (let x = gx0; x < camX + cw + 200; x += grid) {
+      ctx.beginPath(); ctx.moveTo(x, camY - 200); ctx.lineTo(x, camY + ch + 200); ctx.stroke();
+    }
+    for (let y = gy0; y < camY + ch + 200; y += grid) {
+      ctx.beginPath(); ctx.moveTo(camX - 200, y); ctx.lineTo(camX + cw + 200, y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // arena ring
+    if (arena.active) {
+      ctx.globalAlpha = 0.14 + 0.06*Math.sin(t*2.2);
+      ctx.strokeStyle = "rgba(255,90,130,1)";
+      ctx.lineWidth = arena.wall;
+      ctx.beginPath();
+      ctx.arc(arena.x, arena.y, arena.r, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // gravity well ring
+    if (build.slowField.unlocked) {
+      ctx.globalAlpha = 0.10 + 0.05*Math.sin(t*2.3);
+      ctx.strokeStyle = "rgba(255,190,90,1)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, build.slowField.radius, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // asteroids
+    for (const a of asteroids) {
+      if (!inView(a.x, a.y, a.r + 10)) continue;
+
+      ctx.fillStyle = a.fill || "rgba(70,80,115,0.92)";
+      ctx.strokeStyle = a.stroke || "rgba(255,255,255,0.14)";
+      ctx.lineWidth = 2;
+
+      ctx.beginPath();
+      if (a.shape && a.shape.length) {
+        for (let i=0;i<a.shape.length;i++) {
+          const p = a.shape[i];
+          const vx = a.x + Math.cos(p.a) * p.rr;
+          const vy = a.y + Math.sin(p.a) * p.rr;
+          if (i===0) ctx.moveTo(vx, vy);
+          else ctx.lineTo(vx, vy);
+        }
+        ctx.closePath();
+      } else {
+        ctx.arc(a.x, a.y, a.r, 0, Math.PI*2);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      // minimal detail (only for larger rocks)
+      if (a.r > 28) {
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        const ang = a.seed;
+        const rx = a.x + Math.cos(ang)*a.r*0.32;
+        const ry = a.y + Math.sin(ang)*a.r*0.32;
+        ctx.beginPath();
+        ctx.arc(rx, ry, a.r*0.18, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+// Drops
+    for (const d of drops) {
+      if (d.type === "magnet") {
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = "rgba(120,220,255,1)";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r+12, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(210,235,255,.95)";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,.35)";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(d.x-5, d.y, d.r*0.55, -Math.PI/2, Math.PI/2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(d.x+5, d.y, d.r*0.55, -Math.PI/2, Math.PI/2); ctx.stroke();
+      } else if (d.type === "heal") {
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = "rgba(120,255,170,1)";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r+12, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(140,255,190,.95)";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,.35)";
+        ctx.fillRect(d.x-3, d.y-9, 6, 18);
+        ctx.fillRect(d.x-9, d.y-3, 18, 6);
+      } else if (d.type === "nuke") {
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = "rgba(255,90,130,1)";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r+14, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(255,110,160,.95)";
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,.35)";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(d.x-7, d.y+7); ctx.lineTo(d.x+7, d.y-7); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(d.x-7, d.y-7); ctx.lineTo(d.x+7, d.y+7); ctx.stroke();
+      }
+    }
+
+    // XP orbs
+    for (const o of orbsXP) {
+      if (!inView(o.x, o.y, o.r + 10)) continue;
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(120,220,255,.95)";
+      ctx.arc(o.x, o.y, o.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(255,255,255,.70)";
+      ctx.arc(o.x-2, o.y-2, 2.2, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    // bullets
+    for (const b of bullets) {
+      if (!inView(b.x, b.y, 20)) continue;
+      if (b.kind === "missile") {
+        ctx.fillStyle = "rgba(255,190,90,.95)";
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = "rgba(255,90,130,.85)";
+        ctx.beginPath();
+        ctx.arc(b.x - b.vx*0.01, b.y - b.vy*0.01, b.r*1.3, 0, Math.PI*2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else {
+        ctx.beginPath();
+        ctx.fillStyle = b.kind==="droneBolt" ? "rgba(190,255,220,.95)" : "rgba(255,235,180,.95)";
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
+        ctx.fill();
+      }
+    }
+
+    // enemies (space invaders style)
+    for (const e of enemies) {
+      if (!inView(e.x, e.y, e.r + 60)) continue;
+      const pct = clamp(e.hp / e.maxHp, 0, 1);
+
+      // sprite
+      const scale = 3.0;
+      const col =
+        e.kind==="boss"  ? "rgba(255,90,130,.95)" :
+        e.kind==="elite" ? "rgba(255,110,160,.95)" :
+        e.kind==="tank" ? "rgba(255,205,120,.95)" :
+        e.kind==="runner" ? "rgba(140,255,190,.95)" :
+        "rgba(190,205,255,.95)";
+      drawInvader(e.kind, e.x, e.y, scale, col);
+
+      // hp bar
+      ctx.globalAlpha = 0.65;
+      ctx.fillStyle = "rgba(0,0,0,.45)";
+      const barW = (e.kind==="boss") ? 90 : 44;
+      const barH = (e.kind==="boss") ? 6 : 5;
+      ctx.fillRect(e.x - barW/2, e.y + e.r + 14, barW, barH);
+      ctx.fillStyle = "rgba(255,255,255,.75)";
+      ctx.fillRect(e.x - barW/2, e.y + e.r + 14, barW*pct, barH);
+      ctx.globalAlpha = 1;
+    }
+
+    // plasma orbs
+    if (build.orbs.unlocked && build.orbs.count > 0) {
+      const count = build.orbs.count;
+      for (let k=0;k<count;k++){
+        const a = t * build.orbs.spin + (k * (Math.PI*2 / count));
+        const bx = player.x + Math.cos(a) * build.orbs.radius;
+        const by = player.y + Math.sin(a) * build.orbs.radius;
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = "rgba(124,123,255,1)";
+        ctx.beginPath(); ctx.arc(bx, by, 16, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(210,230,255,.92)";
+        ctx.beginPath(); ctx.arc(bx, by, 8.0, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "rgba(120,220,255,.80)";
+        ctx.beginPath(); ctx.arc(bx-2, by-2, 3.0, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // drones
+    if (build.drone.unlocked && build.drone.count > 0) {
+      for (let i=0;i<build.drone.count;i++){
+        const a = t*1.2 + i*(Math.PI*2/build.drone.count);
+        const dx = Math.cos(a)*34;
+        const dy = Math.sin(a)*34;
+        const x = player.x + dx, y = player.y + dy;
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = "rgba(120,255,170,1)";
+        ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "rgba(190,255,220,.95)";
+        ctx.beginPath(); ctx.arc(x, y, 7.2, 0, Math.PI*2); ctx.fill();
+      }
+    }
+
+    // player ship (simple)
+    drawShip(player.x, player.y, player.r);
+
+    // pickup ring
+    ctx.globalAlpha = 0.12;
+    ctx.strokeStyle = "rgba(106,228,255,1)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.pickup, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // pops / effects
+    for (const p of pops) {
+      if (!inView(p.x, p.y, 200)) continue;
+      if (p.kind === "txt") {
+        ctx.fillStyle = "rgba(255,255,255,.9)";
+        ctx.font = "12px system-ui";
+        ctx.fillText(p.text, p.x + 6, p.y);
+      } else if (p.kind === "ring") {
+        const alpha = clamp(p.life / 0.30, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "rgba(124,123,255,.95)";
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "boom") {
+        const alpha = clamp(p.life / 0.22, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "rgba(255,190,90,.35)";
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "hit") {
+        const alpha = clamp(p.life / 0.18, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "rgba(255,90,110,.55)";
+        ctx.beginPath(); ctx.arc(p.x, p.y, 20, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "asterHit") {
+        const alpha = clamp(p.life / 0.26, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "rgba(255,190,90,.45)";
+        ctx.beginPath(); ctx.arc(p.x, p.y, 24, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "shield") {
+        const alpha = clamp(p.life / 0.35, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "rgba(120,220,255,.9)";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, Math.PI*2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "heal") {
+        const alpha = clamp(p.life / 0.35, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "rgba(120,255,170,.95)";
+        ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 26, 0, Math.PI*2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "nuke") {
+        const alpha = clamp(p.life / 0.30, 0, 1);
+        ctx.globalAlpha = alpha*0.35;
+        ctx.fillStyle = "rgba(255,255,255,1)";
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "shieldHit") {
+        const alpha = clamp(p.life / 0.22, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "rgba(120,255,170,.95)";
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 22, 0, Math.PI*2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "laser") {
+        const alpha = clamp(p.life / 0.12, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "rgba(255,255,255,.95)";
+        ctx.lineWidth = p.w || 10;
+        ctx.beginPath(); ctx.moveTo(p.x1, p.y1); ctx.lineTo(p.x2, p.y2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (p.kind === "boltArc") {
+        const alpha = clamp(p.life / 0.16, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = "rgba(106,228,255,.95)";
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(p.x1, p.y1); ctx.lineTo(p.x2, p.y2); ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    ctx.restore();
+
+    // draw touch joystick
+    if (touchStick.active) {
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = "rgba(255,255,255,1)";
+      ctx.beginPath(); ctx.arc(touchStick.sx, touchStick.sy, 78, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.arc(touchStick.x, touchStick.y, 34, 0, Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // HUD content
+    updateHUD(dt);
+
+    // currency labels (handled in updateHUD)
+  }
+
+  function drawShip(x, y, r) {
+    // neon triangle ship
+    ctx.save();
+    ctx.translate(x, y);
+
+    const facing = player.angle;
+    ctx.rotate(facing + Math.PI/2);
+
+    // glow
+    ctx.globalAlpha = 0.20;
+    ctx.fillStyle = "rgba(120,228,255,1)";
+    ctx.beginPath();
+    ctx.moveTo(0, -r-10);
+    ctx.lineTo(r+10, r+10);
+    ctx.lineTo(-r-10, r+10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // hull
+    ctx.fillStyle = "rgba(210,235,255,.95)";
+    ctx.beginPath();
+    ctx.moveTo(0, -r);
+    ctx.lineTo(r, r);
+    ctx.lineTo(-r, r);
+    ctx.closePath();
+    ctx.fill();
+
+    // cockpit
+    ctx.fillStyle = "rgba(124,123,255,.85)";
+    ctx.beginPath();
+    ctx.arc(0, 0, r*0.32, 0, Math.PI*2);
+    ctx.fill();
+
+    // shield ring
+    if (player.shield.unlocked && player.shield.charges > 0) {
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = "rgba(120,255,170,1)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, r*1.7, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+  }
+
+  function formatTime(sec) {
+    sec = Math.max(0, sec);
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${String(s).padStart(2,"0")}`;
+  }
+
+  // ---------- init ----------
+  writeSave();
+  renderShop();
+  setState("MENU");
+  genStars();
+  genAsteroids();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
